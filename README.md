@@ -40,10 +40,10 @@ Before testing, you must configure the workflow in the browser:
 4. **Activation:** Click **Execute Workflow** (at the bottom) to put the canvas into "Listen" mode.
 
 ### 3. Test Workflow (Stress Test)
-Fire 5 concurrent messages from your desktop terminal to verify the logic:
+Fire 5 concurrent messages from your VM to verify the logic:
 ```bash
 for i in {1..5}; do
-  curl -X POST "http://<YOUR-EC2-IP>:5678/webhook-test/devops-alert" \
+  curl -X POST "http://localhost:5678/webhook-test/devops-alert" \
   -H "Content-Type: application/json" \
   -d "{\"severity\": \"critical\", \"message\": \"Alert #$i\", \"id\": $i}" &
 done; wait
