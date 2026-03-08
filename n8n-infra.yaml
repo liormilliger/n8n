@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'n8n Stage 1 - Ubuntu 24.04 + Docker'
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Default: lior-inbal
+    Description: Allows all traffic from MyIP only
+  SecurityGroupId:
+    Type: String
+    Default: sg-0d0da3384972f4851
+  InstanceType:
+    Type: String
+    Default: t3.medium
+
+Resources:
+  n8nInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      # Ubuntu 24.04 LTS AMI for us-east-1 (x86_64)
+      ImageId: ami-0b6c6ebed2801a5cb
+      SecurityGroupIds: 
+        - !Ref SecurityGroupId
+      Tags:
+        - Key: Name
+          Value: n8n-automation-server
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          apt-get install -y docker.io
+          systemctl start docker
+          systemctl enable docker
+          usermod -aG docker ubuntu
+          
+          # Install Docker Compose V2
+          mkdir -p /usr/local/lib/docker/cli-plugins/
+          curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+          chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
