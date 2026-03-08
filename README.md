@@ -1,82 +1,83 @@
-# n8n DevOps Orchestrator - Stage 3
+# n8n DevOps Orchestrator - Stage 4: Cloud-Integrated Sentinel
 
-This repository contains the Infrastructure as Code (CloudFormation) and container orchestration (Docker Compose) for a production-grade n8n automation server.
+This repository orchestrates a production-grade, distributed n8n cluster.
+It features automated IAM management and a dual-purpose logic engine:
+Real-time Alert Processing and Cloud Resource Auditing.
 
 ## Architecture
-- **Cloud:** AWS (us-east-1)
-- **OS:** Ubuntu 24.04 LTS
-- **Engine:** n8n (Latest)
-- **Database:** Postgres 16
+- **Infrastructure:** AWS EC2 (t3.medium) + Ubuntu 24.04
+- **Orchestration:** n8n Queue Mode (Main + Redis + Workers)
+- **Auth:** CloudFormation-managed IAM User (`n8n-s3-sentinel`)
 
-## Prerequisites
-1. AWS CLI configured with appropriate permissions.
-2. A KeyPair named `lior-inbal` in `us-east-1`.
-3. An existing Security Group (`sg-0d0da3384972f4851`).
-
-## Setup Instructions
-
-### 1. Provision Infrastructure
-Deploy the CloudFormation stack:
-```
+## 1. Provision Infrastructure
+Deploy the stack with IAM capabilities:
+```bash
 aws cloudformation create-stack \
-  --stack-name n8n-devops-stage2 \
+  --stack-name n8n-devops-stage4 \
   --template-body file://n8n-infra.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
   --parameters ParameterKey=KeyName,ParameterValue=lior-inbal
+
 ```
 
-### 2. Deploy Application
-1. SSH into the instance.
-2. Create `docker-compose.yaml` and `.env`.
-3. Launch: `docker compose up -d`.
+**Get Credentials from Outputs:**
 
-### 2.5 UI Configuration (The "Logic" Layer)
-Before testing, you must configure the workflow in the browser:
-1. **Access:** Open `http://<EC2-IP>:5678` and log in.
-2. **Create Workflow:** Click "Add Workflow" and name it `DevOps-Alert-Processor`.
-3. **Nodes Setup:**
-    * **Webhook:** Set Method to `POST` and Path to `devops-alert`.
-    * **Filter:** Add a condition where `{{ $json.body.severity }}` equals `critical`.
-    * **Code (JS):** Connect to the "True" path of the Filter and paste the transformation script.
-4. **Activation:** Click **Execute Workflow** (at the bottom) to put the canvas into "Listen" mode.
+```bash
+aws cloudformation describe-stacks --stack-name n8n-devops-stage4 --query "Stacks[0].Outputs"
 
-### 3. Test Workflow (Stress Test)
-Fire 15 concurrent messages from your VM to verify the logic:
 ```
+
+## 2. UI Logic Configurations
+
+### Workflow A: DevOps-Alert-Processor (Real-time)
+
+* **Webhook Node:** HTTP Method: `POST`, Path: `devops-alert`.
+* **Filter Node:** Check if `{{ $json.body.severity }}` is equal to `critical`.
+* **Code Node (JavaScript):**
+```javascript
+for (const item of $input.all()) {
+  item.json.processed_at = new Date().toISOString();
+  item.json.status = "DISPATCHED_TO_SLACK";
+  item.json.original_severity = item.json.severity;
+}
+return $input.all();
+
+```
+
+
+
+### Workflow B: S3-Sentinel-Audit (Infrastructure)
+
+* **Credentials:** Use the `AccessKeyId` and `SecretAccessKey` from CFN Outputs.
+* **AWS S3 Node:** Resource: `Bucket`, Operation: `Get All`.
+* **Filter Node:** Check if `{{ $json.Name }}` contains `test`. (Note: S3 keys are PascalCase).
+* **Code Node (JavaScript):**
+```javascript
+for (const item of $input.all()) {
+  item.json.audit_timestamp = new Date().toISOString();
+  item.json.audit_status = "VERIFIED";
+}
+return $input.all();
+
+```
+
+## 3. Operations & Stress Testing
+
+Fire 15 concurrent messages to verify Worker distribution:
+
+```bash
 for i in {1..15}; do
-  curl -X POST "http://localhost:5678/webhook-test/devops-alert" \
+  curl -X POST "http://<EC2-IP>:5678/webhook-test/devops-alert" \
   -H "Content-Type: application/json" \
   -d "{\"severity\": \"critical\", \"message\": \"Alert #$i\", \"id\": $i}" &
 done; wait
+
 ```
 
-## Stage 3: Scaling & Reliability (Queue Mode)
+## 4. Teardown (Practice Mode)
 
-To handle high-concurrency DevOps workloads, the architecture has been upgraded from "Main" mode to **Queue Mode**. This decouples the UI from the execution engine.
+```bash
+aws cloudformation delete-stack --stack-name n8n-devops-stage4
+aws cloudformation wait stack-delete-complete --stack-name n8n-devops-stage4
 
-### Architecture Components
-* **Redis:** Acts as the message broker (Bull) to manage the task queue.
-* **Main Process:** Handles the Web UI and API requests.
-* **Workers:** Dedicated containers that process the actual workflow logic.
-
-### Scaling Instructions
-
-1.  **Generate Encryption Key:**
-    n8n requires a persistent encryption key to synchronize data between the Main process and Workers.
-    ```bash
-    openssl rand -hex 24
-    ```
-    Add this value to your `.env` file as `N8N_ENCRYPTION_KEY`.
-
-2.  **Deploy the Distributed Stack:**
-    ```bash
-    docker compose up -d
-    ```
-
-3.  **Horizontal Scaling:**
-    To increase processing power (e.g., handling 15+ concurrent webhooks), scale the worker service:
-    ```bash
-    docker compose up -d --scale worker=2
-    ```
-
-4.  **Verification:**
-    Check the cluster status in the UI under **Settings > Queue**. You should see multiple active workers listed.
+```

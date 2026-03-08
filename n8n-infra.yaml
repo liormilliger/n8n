@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'n8n Stage 1 - Ubuntu 24.04 + Docker'
+Description: 'n8n Stage 4 - Ubuntu 24.04 + Docker'
 
 Parameters:
   KeyName:
@@ -19,7 +19,6 @@ Resources:
     Properties:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      # Ubuntu 24.04 LTS AMI for us-east-1 (x86_64)
       ImageId: ami-0b6c6ebed2801a5cb
       SecurityGroupIds: 
         - !Ref SecurityGroupId
@@ -39,3 +38,31 @@ Resources:
           mkdir -p /usr/local/lib/docker/cli-plugins/
           curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+  n8nAutomationUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: n8n-s3-sentinel
+      Policies:
+        - PolicyName: n8nS3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:ListAllMyBuckets'
+                  - 's3:GetBucketTagging'
+                Resource: '*'
+
+  n8nUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref n8nAutomationUser
+
+Outputs:
+  AccessKeyId:
+    Description: n8n IAM Access Key ID
+    Value: !Ref n8nUserAccessKey
+  SecretAccessKey:
+    Description: n8n IAM Secret Access Key
+    Value: !GetAtt n8nUserAccessKey.SecretAccessKey

@@ -1,4 +1,4 @@
-for i in {1..15}; do
+for i in {1..5}; do
   curl -X POST "http://localhost:5678/webhook-test/devops-alert" \
   -H "Content-Type: application/json" \
   -d "{\"severity\": \"critical\", \"message\": \"EKS Alert Number $i\", \"id\": $i}" & 
