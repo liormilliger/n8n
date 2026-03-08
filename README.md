@@ -1,4 +1,4 @@
-# n8n DevOps Orchestrator - Stage 2
+# n8n DevOps Orchestrator - Stage 3
 
 This repository contains the Infrastructure as Code (CloudFormation) and container orchestration (Docker Compose) for a production-grade n8n automation server.
 
@@ -40,10 +40,43 @@ Before testing, you must configure the workflow in the browser:
 4. **Activation:** Click **Execute Workflow** (at the bottom) to put the canvas into "Listen" mode.
 
 ### 3. Test Workflow (Stress Test)
-Fire 5 concurrent messages from your VM to verify the logic:
-```bash
-for i in {1..5}; do
+Fire 15 concurrent messages from your VM to verify the logic:
+```
+for i in {1..15}; do
   curl -X POST "http://localhost:5678/webhook-test/devops-alert" \
   -H "Content-Type: application/json" \
   -d "{\"severity\": \"critical\", \"message\": \"Alert #$i\", \"id\": $i}" &
 done; wait
+```
+
+## Stage 3: Scaling & Reliability (Queue Mode)
+
+To handle high-concurrency DevOps workloads, the architecture has been upgraded from "Main" mode to **Queue Mode**. This decouples the UI from the execution engine.
+
+### Architecture Components
+* **Redis:** Acts as the message broker (Bull) to manage the task queue.
+* **Main Process:** Handles the Web UI and API requests.
+* **Workers:** Dedicated containers that process the actual workflow logic.
+
+### Scaling Instructions
+
+1.  **Generate Encryption Key:**
+    n8n requires a persistent encryption key to synchronize data between the Main process and Workers.
+    ```bash
+    openssl rand -hex 24
+    ```
+    Add this value to your `.env` file as `N8N_ENCRYPTION_KEY`.
+
+2.  **Deploy the Distributed Stack:**
+    ```bash
+    docker compose up -d
+    ```
+
+3.  **Horizontal Scaling:**
+    To increase processing power (e.g., handling 15+ concurrent webhooks), scale the worker service:
+    ```bash
+    docker compose up -d --scale worker=2
+    ```
+
+4.  **Verification:**
+    Check the cluster status in the UI under **Settings > Queue**. You should see multiple active workers listed.
