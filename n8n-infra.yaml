@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'n8n Stage 4 - Ubuntu 24.04 + Docker'
+Description: 'n8n Stage 5 - Ubuntu 24.04 + Docker'
 
 Parameters:
   KeyName:
@@ -50,6 +50,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
+                  - 'ec2:DescribeVolumes'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeInstances'
                   - 's3:ListAllMyBuckets'
                   - 's3:GetBucketTagging'
                 Resource: '*'
@@ -66,3 +69,4 @@ Outputs:
   SecretAccessKey:
     Description: n8n IAM Secret Access Key
     Value: !GetAtt n8nUserAccessKey.SecretAccessKey
+

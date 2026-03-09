@@ -1,83 +1,106 @@
-# n8n DevOps Orchestrator - Stage 4: Cloud-Integrated Sentinel
+# n8n DevOps Orchestrator - Stage 5: The Infrastructure Sentinel
 
-This repository orchestrates a production-grade, distributed n8n cluster.
-It features automated IAM management and a dual-purpose logic engine:
-Real-time Alert Processing and Cloud Resource Auditing.
+This repository manages a distributed, auto-scaling n8n cluster on AWS designed to process real-time webhooks
+and audit cloud resources (S3, EBS, and Security Groups).
 
-## Architecture
-- **Infrastructure:** AWS EC2 (t3.medium) + Ubuntu 24.04
-- **Orchestration:** n8n Queue Mode (Main + Redis + Workers)
-- **Auth:** CloudFormation-managed IAM User (`n8n-s3-sentinel`)
+## 1. Infrastructure Provisioning
 
-## 1. Provision Infrastructure
-Deploy the stack with IAM capabilities:
+### Step A: Deploy the CloudStack
+
+Use your `n8n-infra.yaml` to launch the EC2 instance and create the scoped IAM user (`n8n-cloud-auditor`).
+
 ```bash
 aws cloudformation create-stack \
-  --stack-name n8n-devops-stage4 \
+  --stack-name n8n-devops-stage5 \
   --template-body file://n8n-infra.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters ParameterKey=KeyName,ParameterValue=lior-inbal
-
 ```
 
-**Get Credentials from Outputs:**
+### Step B: Retrieve Vault Credentials
+
+Once the stack is `CREATE_COMPLETE`, grab your Access Keys for the n8n UI:
 
 ```bash
-aws cloudformation describe-stacks --stack-name n8n-devops-stage4 --query "Stacks[0].Outputs"
-
+aws cloudformation describe-stacks --stack-name n8n-devops-stage5 --query "Stacks[0].Outputs"
 ```
 
-## 2. UI Logic Configurations
+---
 
-### Workflow A: DevOps-Alert-Processor (Real-time)
+## 2. Server Deployment (The Cluster)
+
+1. **SSH into the VM:** `ssh -i lior-inbal.pem ubuntu@<EC2-IP>`
+2. **Setup Folder:** `mkdir n8n-config && cd n8n-config`
+3. **Environment Setup:** Create a `.env` file. Generate a key with `openssl rand -hex 24` for `N8N_ENCRYPTION_KEY`.
+4. **Launch with Workers:** This command starts the Main UI and 2 Workers for parallel processing.
+
+```bash
+docker compose up -d --scale worker=2
+```
+
+---
+
+## 3. Workflow Logic: Node-by-Node Guide
+
+### A. Real-Time Alert Webhook
 
 * **Webhook Node:** HTTP Method: `POST`, Path: `devops-alert`.
-* **Filter Node:** Check if `{{ $json.body.severity }}` is equal to `critical`.
-* **Code Node (JavaScript):**
+* **Filter Node:** Condition: `{{ $json.body.severity }}` equals `critical`.
+* **Code Node:**
 ```javascript
 for (const item of $input.all()) {
   item.json.processed_at = new Date().toISOString();
-  item.json.status = "DISPATCHED_TO_SLACK";
-  item.json.original_severity = item.json.severity;
+  item.json.status = "DISPATCHED";
 }
 return $input.all();
-
 ```
 
+### B. S3 Inventory Audit
 
-
-### Workflow B: S3-Sentinel-Audit (Infrastructure)
-
-* **Credentials:** Use the `AccessKeyId` and `SecretAccessKey` from CFN Outputs.
 * **AWS S3 Node:** Resource: `Bucket`, Operation: `Get All`.
-* **Filter Node:** Check if `{{ $json.Name }}` contains `test`. (Note: S3 keys are PascalCase).
-* **Code Node (JavaScript):**
+* **Credential:** Use the keys from your CloudFormation output.
+
+### C. EBS "Zombie" Hunter (HTTP Chain)
+
+1. **HTTP Request Node:**
+* **URL:** `https://ec2.us-east-1.amazonaws.com/?Action=DescribeVolumes&Version=2016-11-15`
+* **Auth:** AWS Signature v4.
+2. **XML Node:** Action: `To JSON`, Property: `data`.
+3. **Code Node (Flattening):**
+
 ```javascript
-for (const item of $input.all()) {
-  item.json.audit_timestamp = new Date().toISOString();
-  item.json.audit_status = "VERIFIED";
-}
-return $input.all();
-
+const items = $input.first().json.DescribeVolumesResponse.volumeSet.item;
+return items.map(v => ({ json: v }));
 ```
 
-## 3. Operations & Stress Testing
+### D. Security Group "Gatekeeper" (HTTP Chain)
 
-Fire 15 concurrent messages to verify Worker distribution:
+1. **HTTP Request Node:**
+* **URL:** `https://ec2.us-east-1.amazonaws.com/?Action=DescribeSecurityGroups&Version=2016-11-15`
+* **Auth:** AWS Signature v4.
 
-```bash
-for i in {1..15}; do
-  curl -X POST "http://<EC2-IP>:5678/webhook-test/devops-alert" \
-  -H "Content-Type: application/json" \
-  -d "{\"severity\": \"critical\", \"message\": \"Alert #$i\", \"id\": $i}" &
-done; wait
 
+2. **XML Node:** Action: `To JSON`, Property: `data`.
+3. **Code Node (Security Logic):**
+
+```javascript
+const sgs = $input.first().json.DescribeSecurityGroupsResponse.securityGroupInfo.item;
+let rules = [];
+sgs.forEach(sg => {
+  const perms = Array.isArray(sg.ipPermissions.item) ? sg.ipPermissions.item : [sg.ipPermissions.item];
+  perms.forEach(p => {
+    rules.push({ json: { name: sg.groupName, port: p.fromPort, cidr: p.ipRanges.item.cidrIp } });
+  });
+});
+return rules;
 ```
 
-## 4. Teardown (Practice Mode)
+---
+
+## 4. Teardown
+
+To practice the "Fresh Start" methodology:
 
 ```bash
-aws cloudformation delete-stack --stack-name n8n-devops-stage4
-aws cloudformation wait stack-delete-complete --stack-name n8n-devops-stage4
-
+aws cloudformation delete-stack --stack-name n8n-devops-stage5
 ```
