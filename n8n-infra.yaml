@@ -1,19 +1,32 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'n8n Stage 5 - Ubuntu 24.04 + Docker'
+Description: 'n8n Stage 5 - Stable Rebuild with Existing Key'
 
 Parameters:
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
     Default: lior-inbal
-    Description: Allows all traffic from MyIP only
-  SecurityGroupId:
-    Type: String
-    Default: sg-0d0da3384972f4851
+    Description: Name of your existing .pem key pair
   InstanceType:
     Type: String
     Default: t3.medium
+  AdminIP:
+    Type: String
+    Description: Your public IP with CIDR (e.g., 1.2.3.4/32)
+    Default: 0.0.0.0/0
 
 Resources:
+  # Security Group named n8n-infra, locked to your IP
+  n8nSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: n8n-infra
+      GroupDescription: Allow all traffic from my current IP only
+      SecurityGroupIngress:
+        - IpProtocol: -1 
+          FromPort: -1
+          ToPort: -1
+          CidrIp: !Ref AdminIP
+
   n8nInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -21,7 +34,7 @@ Resources:
       KeyName: !Ref KeyName
       ImageId: ami-0b6c6ebed2801a5cb
       SecurityGroupIds: 
-        - !Ref SecurityGroupId
+        - !GetAtt n8nSecurityGroup.GroupId
       Tags:
         - Key: Name
           Value: n8n-automation-server
@@ -33,8 +46,6 @@ Resources:
           systemctl start docker
           systemctl enable docker
           usermod -aG docker ubuntu
-          
-          # Install Docker Compose V2
           mkdir -p /usr/local/lib/docker/cli-plugins/
           curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
           chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
@@ -42,9 +53,9 @@ Resources:
   n8nAutomationUser:
     Type: AWS::IAM::User
     Properties:
-      UserName: n8n-s3-sentinel
+      UserName: n8n-cloud-auditor
       Policies:
-        - PolicyName: n8nS3Access
+        - PolicyName: n8nAuditAccess
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -63,10 +74,10 @@ Resources:
       UserName: !Ref n8nAutomationUser
 
 Outputs:
+  InstancePublicIP:
+    Description: Public IP of n8n server
+    Value: !GetAtt n8nInstance.PublicIp
   AccessKeyId:
-    Description: n8n IAM Access Key ID
     Value: !Ref n8nUserAccessKey
   SecretAccessKey:
-    Description: n8n IAM Secret Access Key
     Value: !GetAtt n8nUserAccessKey.SecretAccessKey
-

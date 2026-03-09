@@ -89,7 +89,7 @@ let rules = [];
 sgs.forEach(sg => {
   const perms = Array.isArray(sg.ipPermissions.item) ? sg.ipPermissions.item : [sg.ipPermissions.item];
   perms.forEach(p => {
-    rules.push({ json: { name: sg.groupName, port: p.fromPort, cidr: p.ipRanges.item.cidrIp } });
+    rules.push({ json: { name: sg.groupName, port: p.fromPort, cidr: p.ipRanges.item } });
   });
 });
 return rules;
