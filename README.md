@@ -14,7 +14,7 @@ aws cloudformation create-stack \
   --stack-name n8n-devops-stage5 \
   --template-body file://n8n-infra.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameters ParameterKey=KeyName,ParameterValue=lior-inbal
+  --parameters ParameterKey=KeyName,ParameterValue=n8n-infra
 ```
 
 ### Step B: Retrieve Vault Credentials
@@ -29,7 +29,7 @@ aws cloudformation describe-stacks --stack-name n8n-devops-stage5 --query "Stack
 
 ## 2. Server Deployment (The Cluster)
 
-1. **SSH into the VM:** `ssh -i lior-inbal.pem ubuntu@<EC2-IP>`
+1. **SSH into the VM:** `ssh -i n8n-infra.pem ubuntu@<EC2-IP>`
 2. **Setup Folder:** `mkdir n8n-config && cd n8n-config`
 3. **Environment Setup:** Create a `.env` file. Generate a key with `openssl rand -hex 24` for `N8N_ENCRYPTION_KEY`.
 4. **Launch with Workers:** This command starts the Main UI and 2 Workers for parallel processing.
