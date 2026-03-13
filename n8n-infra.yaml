@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'n8n Stage 5 - Stable Rebuild with Existing Key'
+Description: 'n8n Stage 6 - Stable Rebuild with Existing Key'
 
 Parameters:
   KeyName:
@@ -8,7 +8,7 @@ Parameters:
     Description: Name of your existing .pem key pair
   InstanceType:
     Type: String
-    Default: t3.medium
+    Default: t3a.medium
   AdminIP:
     Type: String
     Description: Your public IP with CIDR (e.g., 1.2.3.4/32)

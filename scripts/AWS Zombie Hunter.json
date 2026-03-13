@@ -1,0 +1,246 @@
+{
+  "name": "AWS Zombie Hunter",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "529522e1-2e2d-4546-887f-6eeab2ba8fdc",
+      "name": "XML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.DescribeVolumesResponse.volumeSet.item;\nreturn items.map(v => ({ json: v }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "c31b78de-7f17-4574-ad31-4f6154f3db26",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "https://ec2.us-east-1.amazonaws.com/?Action=DescribeSecurityGroups&Version=2016-11-15",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "aws",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        -144
+      ],
+      "id": "464ea66d-0d75-4dbe-a626-219939b7410a",
+      "name": "SecurityGroups",
+      "credentials": {
+        "aws": {
+          "id": "Z4R6INB3Zy6wQzUL",
+          "name": "AWS (IAM) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -144
+      ],
+      "id": "842180b7-a9e7-4e0c-ae46-81f355c0d330",
+      "name": "XML1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sgs = $input.first().json.DescribeSecurityGroupsResponse.securityGroupInfo.item;\nlet rules = [];\nsgs.forEach(sg => {\n  const perms = Array.isArray(sg.ipPermissions.item) ? sg.ipPermissions.item : [sg.ipPermissions.item];\n  perms.forEach(p => {\n    rules.push({ json: { name: sg.groupName, port: p.fromPort, cidr: p.ipRanges.item } });\n  });\n});\nreturn rules;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -144
+      ],
+      "id": "15552c51-7dc1-4395-ab18-375835799d47",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        -144
+      ],
+      "id": "65f48a33-dca1-41e4-a574-1de429c3fda3",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nlet report = {\n  volumes: [],\n  s3_buckets: [],\n  security_groups: []\n};\n\nfor (const item of items) {\n  const data = item.json;\n\n  // 1. Updated EBS Detection: Look for volumeId directly\n  if (data.volumeId) {\n    report.volumes.push(data);\n  } \n  \n  // 2. S3 Detection: Look for Bucket Name or ARN\n  else if (data.BucketArn || (data.Name && data.CreationDate)) {\n    report.s3_buckets.push(data);\n  } \n  \n  // 3. Security Group Detection: Look for SG name and network rules\n  else if (data.name && (data.cidr || data.port)) {\n    report.security_groups.push(data);\n  }\n}\n\nreturn [{ json: report }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        -144
+      ],
+      "id": "17db0cfe-8e69-4169-91db-d4e0832b8f58",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -80
+      ],
+      "id": "5e500ece-40a4-4f9a-887d-b720145b7600",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "url": "https://ec2.us-east-1.amazonaws.com/?Action=DescribeVolumes&Version=2016-11-15",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "aws",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "2e66d0e3-7bbc-4fd4-9bb6-151b928c7c6f",
+      "name": "Volumes",
+      "credentials": {
+        "aws": {
+          "id": "Z4R6INB3Zy6wQzUL",
+          "name": "AWS (IAM) account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "XML": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SecurityGroups": {
+      "main": [
+        [
+          {
+            "node": "XML1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "XML1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "SecurityGroups",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Volumes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Volumes": {
+      "main": [
+        [
+          {
+            "node": "XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c07892de-f0be-4078-b5ed-37b3d6a26e5e",
+  "meta": {
+    "instanceId": "28fb96d574a5bdfde6c966e24358173e46339190b4f58dd5becf322e80d866d5"
+  },
+  "id": "l71LSEz98wRXy3UI",
+  "tags": []
+}
