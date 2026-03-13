@@ -1,0 +1,151 @@
+{
+  "name": "Agentic-AI",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b9e4dda7-1615-482c-af83-e840e31bb8d4",
+      "name": "Simple Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "position": [
+        336,
+        208
+      ],
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "67bb48a9-fd78-4987-8d8e-5a623dc14efc",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "position": [
+        240,
+        0
+      ],
+      "typeVersion": 1.8
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        112,
+        208
+      ],
+      "id": "29d2ee18-dbdc-4fed-aa32-788c5eac8703",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VdZWyRj4hD0HnHj2",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "This should monitor my aws account resources",
+        "workflowId": {
+          "__rl": true,
+          "value": "KMNXMnY8DcK4jjBA",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/KMNXMnY8DcK4jjBA",
+          "cachedResultName": "AWS Zombie Hunter"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        528,
+        192
+      ],
+      "id": "ae472dd3-2bf2-4855-a8c6-5c120f72da49",
+      "name": "Call 'AWS Zombie Hunter'"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5647aa08-0416-4d46-8d84-1794d047aa7b",
+      "name": "When chat message received",
+      "webhookId": "73bd88cc-0e35-425a-bc7b-b19553021013",
+      "alwaysOutputData": false
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'AWS Zombie Hunter'": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "3d4ce052-9ec7-48af-8fbf-cca4c491332a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "28fb96d574a5bdfde6c966e24358173e46339190b4f58dd5becf322e80d866d5"
+  },
+  "id": "AUXdE3OY4Qdob1IY",
+  "tags": []
+}

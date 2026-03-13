@@ -28,6 +28,8 @@ services:
       - N8N_SECURE_COOKIE=false
       - EXECUTIONS_MODE=queue
       - QUEUE_BULL_REDIS_HOST=redis
+      - WEBHOOK_URL=${WEBHOOK_URL}
+
     ports:
       - "5678:5678"
     depends_on:
